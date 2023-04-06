@@ -3,12 +3,12 @@ package discovery
 import (
 	"air_clipboard/models"
 	"encoding/json"
-	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/XieJCHenry/gokits/collections/slice"
+	"go.uber.org/zap"
 )
 
 const (
@@ -36,10 +36,10 @@ type endPointDiscovery struct {
 	endpoints slice.Slice[*models.EndPoint]
 	mtx       sync.Mutex
 	stopChan  chan struct{}
-	logger    *log.Logger
+	logger    *zap.SugaredLogger
 }
 
-func New(udpPort int, discoveryInterval int) EndPointDiscovery {
+func New(logger *zap.SugaredLogger, udpPort int, discoveryInterval int) EndPointDiscovery {
 	if udpPort <= 0 {
 		udpPort = DefaultPort
 	}
@@ -52,7 +52,7 @@ func New(udpPort int, discoveryInterval int) EndPointDiscovery {
 		endpoints: slice.New[*models.EndPoint](),
 		mtx:       sync.Mutex{},
 		stopChan:  make(chan struct{}, 1),
-		logger:    log.Default(),
+		logger:    logger,
 	}
 }
 
@@ -80,7 +80,7 @@ func (e *endPointDiscovery) startReceiver() {
 	if err != nil {
 		e.logger.Fatalf("listen udp %d failed, err=%s", e.udpPort, err)
 	}
-	e.logger.Printf("start %s ...")
+	e.logger.Info("start %s ...")
 	defer con.Close()
 
 	for {
@@ -94,12 +94,12 @@ func (e *endPointDiscovery) startReceiver() {
 				var data [1024]byte
 				n, addr, err := con.ReadFromUDP(data[:])
 				if err != nil {
-					e.logger.Printf("read from udp failed, err=%s", err)
+					e.logger.Errorf("read from udp failed, err=%s", err)
 					continue
 				}
 				// 获取收到的数据包，解析是否是air_clipboard其他endpoint发来的
 				if packet, ok := e.parsePacket(data[:n]); ok {
-					e.logger.Printf("receive packet from %s", addr)
+					e.logger.Errorf("receive packet from %s", addr)
 					e.updateCache(packet)
 				}
 			}
@@ -125,10 +125,10 @@ func (e *endPointDiscovery) broadcastSelfInfo() {
 	if packetBytes, ok := e.preparePacket(); ok {
 		_, err = remoteCon.Write(packetBytes)
 		if err != nil {
-			e.logger.Printf("client write failed, err=%s", err)
+			e.logger.Errorf("client write failed, err=%s", err)
 			return
 		}
-		e.logger.Println("write to remote...")
+		e.logger.Info("write to remote...")
 	}
 }
 
@@ -162,7 +162,7 @@ func (e *endPointDiscovery) parsePacket(bytes []byte) (*EndpointPacket, bool) {
 	packet := &EndpointPacket{}
 	err := json.Unmarshal(bytes, packet)
 	if err != nil {
-		e.logger.Printf("unmarshal packet from other failed, err=%s", err)
+		e.logger.Errorf("unmarshal packet from other failed, err=%s", err)
 		return nil, false
 	}
 	return packet, true
@@ -177,6 +177,6 @@ func (e *endPointDiscovery) updateCache(packet *EndpointPacket) {
 	} else if packet.Status == StatusOffline {
 		e.endpoints.RemoveIfPresent(endPoint)
 	} else {
-		e.logger.Printf("unknown status '%s' from endpoint = %v", packet.Status, endPoint)
+		e.logger.Errorf("unknown status '%s' from endpoint = %v", packet.Status, endPoint)
 	}
 }

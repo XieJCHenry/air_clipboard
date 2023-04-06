@@ -2,42 +2,43 @@ package main
 
 import (
 	"air_clipboard/discovery"
-	"log"
-	"net"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"go.uber.org/zap"
 )
 
-var logger = log.Default()
-
 const (
-	RecvPort = 9456
-	SendPort = 9457
+	DiscoveryPort = 9456
+	TransferPort  = 9457
 )
 
 func main() {
 
-	discoveryService := discovery.New(SendPort, 5)
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(fmt.Sprintf("new logger failed, err=%s", err))
+	}
+	defer logger.Sync()
+	sugaredLogger := logger.Sugar()
+
+	defer func() {
+		if e := recover(); e != nil {
+			sugaredLogger.Infof("panic recover, err = %s", e)
+		}
+	}()
+
+	exitChan := make(chan os.Signal, 1)
+	signal.Notify(exitChan, syscall.SIGINT)
+
+	discoveryService := discovery.New(sugaredLogger, DiscoveryPort, 5)
 	go discoveryService.Start()
 
-}
+	sugaredLogger.Info("air_clipboard running...")
 
-func broadcastAddressList() []*net.IPNet {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		logger.Fatalf("addrs failed, err=%s", err)
-	}
-
-	var (
-		result []*net.IPNet
-	)
-	for i, addr := range addrs {
-		ip, ok := addr.(*net.IPNet)
-		if ok && !ip.IP.IsLoopback() {
-			if ip.IP.To4() != nil {
-				it, _ := net.InterfaceByIndex(i)
-				logger.Printf("ip: %s, mask: %s, mac: %v", ip.IP, ip.Mask, it)
-				result = append(result, ip)
-			}
-		}
-	}
-	return result
+	<-exitChan
+	sugaredLogger.Info("air_clipboard exit.")
+	os.Exit(0)
 }
