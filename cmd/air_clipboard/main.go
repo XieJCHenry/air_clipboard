@@ -24,6 +24,7 @@ const (
 	TransferPort  = 9457
 )
 
+// todo 获取局域网内自己的Ip
 var (
 	sugaredLogger *zap.SugaredLogger
 	meta          = fyne.AppMetadata{
@@ -50,11 +51,10 @@ func main() {
 	sugaredLogger = logger.Sugar()
 
 	discoveryService := discovery.New(sugaredLogger, DiscoveryPort, 1, selfInfo)
-	discoveryService.BroadcastSelf()
 	go discoveryService.Start()
 
 	transferService := transfer.New(sugaredLogger, TransferPort, selfInfo)
-	_ = transferService
+	go transferService.Start()
 	// backend start end --------------------------------------------------------------------------------
 
 	myApp := app.NewWithID(meta.ID)
@@ -72,8 +72,12 @@ func main() {
 	go func() {
 		for {
 			select {
-			case _ = <-discoveryService.OnDiscoverEvent():
+			case event := <-discoveryService.OnDiscoverEvent():
 				{
+					// notify transfer service
+					transferService.AddTransfer(event.Endpoint)
+					// update ui
+					endpoints = []interface{}{selfInfo}
 					endpointsVO.Set(endpoints) // 重置
 					for _, point := range discoveryService.EndPoints().ToBuiltIn() {
 						endpointsVO.Append(point)

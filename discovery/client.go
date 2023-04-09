@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/XieJCHenry/gokits/collections/slice"
+	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
 )
 
@@ -67,6 +68,8 @@ func (e *endPointDiscovery) Start() {
 	defer ticker.Stop()
 
 	go e.startReceiver()
+	time.Sleep(5)
+	e.broadcastSelfInfo()
 
 	for {
 		select {
@@ -86,7 +89,7 @@ func (e *endPointDiscovery) startReceiver() {
 	if err != nil {
 		e.logger.Fatalf("listen udp %d failed, err=%s", e.udpPort, err)
 	}
-	e.logger.Info("start %s ...")
+	e.logger.Info("start ...")
 	defer con.Close()
 
 	for {
@@ -104,8 +107,9 @@ func (e *endPointDiscovery) startReceiver() {
 					continue
 				}
 				// 获取收到的数据包，解析是否是air_clipboard其他endpoint发来的
+
 				if packet, ok := e.parsePacket(data[:n]); ok {
-					e.logger.Infof("receive packet from %s", addr)
+					packet.From.Ip = addr.IP.String()
 					e.updateCache(packet)
 				}
 			}
@@ -187,6 +191,11 @@ func (e *endPointDiscovery) updateCache(packet *EndpointPacket) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 	endPoint := packet.From
+	if cmp.Equal(endPoint, e.selfInfo) {
+		return
+	}
+	e.logger.Infof("receive packet from %s", endPoint.Ip)
+
 	if packet.Status == StatusOnline {
 		e.endpoints.AppendIfAbsent(endPoint)
 		e.discoverEvenChan <- &DiscoveryEvent{

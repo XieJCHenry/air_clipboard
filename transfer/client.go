@@ -4,6 +4,7 @@ import (
 	"air_clipboard/models"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 )
 
 type Postman interface {
+	Start()
 	AddTransfer(target *models.EndPoint)
 	RemoveTransfer(target *models.EndPoint)
 	TransferTo(endPointKey string, message *models.Message) error
@@ -40,6 +42,33 @@ func New(logger *zap.SugaredLogger, port int, selfInfo *models.EndPoint) Postman
 		guardians:    gmap.New[string, *guardian](),
 		selfInfo:     selfInfo,
 		recvChan:     make(chan *models.Message, 1024),
+	}
+}
+
+func (p *postman) Start() {
+
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", p.transferPort))
+	if err != nil {
+		panic(fmt.Sprintf("resolve tcp addr failed, err = %s", err))
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		panic(fmt.Sprintf("postman listen at %d failed, err = %s", p.transferPort, err))
+	}
+	for {
+		conn, err := listener.AcceptTCP()
+		if err != nil {
+			p.logger.Errorf("accept tcp failed, err = %s", err)
+			continue
+		}
+		remoteAddr := conn.RemoteAddr().String()
+		elems := strings.SplitN(remoteAddr, ":", 2)
+		if len(elems) != 2 {
+			continue
+		}
+		remoteIp, _ := elems[0], elems[1]
+		newEndpoint := &models.EndPoint{Ip: remoteIp}
+		p.AddTransfer(newEndpoint)
 	}
 }
 

@@ -81,6 +81,10 @@ func Test_GetOutBoundIP(t *testing.T) {
 	}
 }
 
+func Test_GetOutBoundIP2(t *testing.T) {
+	ip, _ := GetOutBoundIP()
+	t.Logf("ip = %s", ip)
+}
 func GetOutBoundIP() (ip string, err error) {
 	conn, err := net.Dial("udp", "8.8.8.8:53")
 	if err != nil {

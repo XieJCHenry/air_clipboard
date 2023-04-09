@@ -22,7 +22,7 @@ func (ep *EndPoint) JsonString() string {
 
 func (ep *EndPoint) Key() string {
 	if ep.Key_ == "" {
-		ep.Key_ = fmt.Sprintf("%s$%s$%s", ep.Ip, ep.Name, ep.DeviceName)
+		ep.Key_ = fmt.Sprintf("%s", ep.Ip)
 	}
 	return ep.Key_
 }
