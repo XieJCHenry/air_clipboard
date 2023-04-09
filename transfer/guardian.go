@@ -3,26 +3,27 @@ package transfer
 import (
 	"air_clipboard/models"
 	"net"
-	"time"
 
 	"go.uber.org/zap"
 )
 
 type guardian struct {
-	logger *zap.SugaredLogger
-	id     string
-	conn   net.Conn
-	exit   chan struct{}
-	C      chan *models.Message
+	logger     *zap.SugaredLogger
+	id         string
+	conn       net.Conn
+	exit       chan struct{}
+	sendChan   chan *models.Message
+	submitChan chan *models.Message
 }
 
-func newGuardian(logger *zap.SugaredLogger, key string, conn net.Conn) *guardian {
+func newGuardian(logger *zap.SugaredLogger, key string, conn net.Conn, submitChan chan *models.Message) *guardian {
 	return &guardian{
-		logger: logger,
-		id:     key,
-		conn:   conn,
-		exit:   make(chan struct{}, 1),
-		C:      make(chan *models.Message, 1024),
+		logger:     logger,
+		id:         key,
+		conn:       conn,
+		exit:       make(chan struct{}, 1),
+		sendChan:   make(chan *models.Message, 32),
+		submitChan: submitChan,
 	}
 }
 
@@ -32,24 +33,19 @@ func (g *guardian) Id() string {
 
 func (g *guardian) Start() {
 
-	// wait until C is clear
-	defer func() {
-		close(g.C)
-		for {
-			if len(g.C) == 0 {
-				g.logger.Debugf("guardian [%s] truely exit..", g.id)
-				break
-			} else {
-				time.Sleep(5 * time.Second)
-			}
-		}
-	}()
-
 	for {
 		select {
 		case <-g.exit:
 			{
 				return
+			}
+		case msg := <-g.sendChan:
+			{
+				_, err := g.conn.Write(msg.Marshal())
+				if err != nil {
+					g.logger.Errorf("write failed, err = %s", err)
+					continue
+				}
 			}
 		default:
 			{
@@ -62,9 +58,15 @@ func (g *guardian) Start() {
 				buffer = buffer[:n]
 				msg := &models.Message{}
 				msg.Unmarshal(buffer)
-				g.C <- msg
+				g.submitChan <- msg
 			}
 		}
+	}
+}
+
+func (g *guardian) Send(msg *models.Message) {
+	if msg != nil {
+		g.sendChan <- msg
 	}
 }
 

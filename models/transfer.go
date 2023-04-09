@@ -8,6 +8,8 @@ type Message struct {
 }
 
 type MessageHeader struct {
+	Sender   string `json:"sender,omitempty"`
+	SendTime int64  `json:"sendTime,omitempty"`
 }
 
 type MessageBody struct {

@@ -13,33 +13,37 @@ import (
 
 const (
 	DefaultPort              = 9456
-	DefaultDiscoveryInterval = 5 // min
+	DefaultDiscoveryInterval = 1 // min
 )
 
 /**
 EndPoint
 局域网内每个设备都是一个endpoint
+
+todo 新增数据包协议类型，功能：启动时广播自身的信息，接收到的节点应立即回复它的信息
 */
 
 type EndPointDiscovery interface {
 	Start()
 	EndPoints() slice.Slice[*models.EndPoint]
-	SetSelfInfo(endpoint *models.EndPoint)
+	GetSelfInfo() *models.EndPoint
 	BroadcastSelf()
 	Stop()
+	OnDiscoverEvent() chan *DiscoveryEvent
 }
 
 type endPointDiscovery struct {
-	udpPort   int
-	interval  int
-	selfInfo  *models.EndPoint
-	endpoints slice.Slice[*models.EndPoint]
-	mtx       sync.Mutex
-	stopChan  chan struct{}
-	logger    *zap.SugaredLogger
+	udpPort          int
+	interval         int
+	selfInfo         *models.EndPoint
+	endpoints        slice.Slice[*models.EndPoint]
+	mtx              sync.Mutex
+	stopChan         chan struct{}
+	discoverEvenChan chan *DiscoveryEvent
+	logger           *zap.SugaredLogger
 }
 
-func New(logger *zap.SugaredLogger, udpPort int, discoveryInterval int) EndPointDiscovery {
+func New(logger *zap.SugaredLogger, udpPort int, discoveryInterval int, selfInfo *models.EndPoint) EndPointDiscovery {
 	if udpPort <= 0 {
 		udpPort = DefaultPort
 	}
@@ -47,12 +51,14 @@ func New(logger *zap.SugaredLogger, udpPort int, discoveryInterval int) EndPoint
 		discoveryInterval = DefaultDiscoveryInterval
 	}
 	return &endPointDiscovery{
-		udpPort:   udpPort,
-		interval:  discoveryInterval,
-		endpoints: slice.New[*models.EndPoint](),
-		mtx:       sync.Mutex{},
-		stopChan:  make(chan struct{}, 1),
-		logger:    logger,
+		udpPort:          udpPort,
+		interval:         discoveryInterval,
+		endpoints:        slice.New[*models.EndPoint](),
+		mtx:              sync.Mutex{},
+		stopChan:         make(chan struct{}, 1),
+		discoverEvenChan: make(chan *DiscoveryEvent),
+		logger:           logger,
+		selfInfo:         selfInfo,
 	}
 }
 
@@ -99,7 +105,7 @@ func (e *endPointDiscovery) startReceiver() {
 				}
 				// 获取收到的数据包，解析是否是air_clipboard其他endpoint发来的
 				if packet, ok := e.parsePacket(data[:n]); ok {
-					e.logger.Errorf("receive packet from %s", addr)
+					e.logger.Infof("receive packet from %s", addr)
 					e.updateCache(packet)
 				}
 			}
@@ -142,8 +148,8 @@ func (e *endPointDiscovery) EndPoints() slice.Slice[*models.EndPoint] {
 	return endpoints
 }
 
-func (e *endPointDiscovery) SetSelfInfo(endpoint *models.EndPoint) {
-	e.selfInfo = endpoint
+func (e *endPointDiscovery) GetSelfInfo() *models.EndPoint {
+	return e.selfInfo
 }
 
 func (e *endPointDiscovery) BroadcastSelf() {
@@ -154,8 +160,17 @@ func (e *endPointDiscovery) Stop() {
 	e.stopChan <- struct{}{}
 }
 
+func (e *endPointDiscovery) OnDiscoverEvent() chan *DiscoveryEvent {
+	return e.discoverEvenChan
+}
+
 func (e *endPointDiscovery) preparePacket() ([]byte, bool) {
-	return []byte(e.selfInfo.JsonString()), true
+	packet := &EndpointPacket{
+		From:   e.selfInfo,
+		Status: StatusOnline,
+	}
+	bytes, err := json.Marshal(packet)
+	return bytes, err == nil
 }
 
 func (e *endPointDiscovery) parsePacket(bytes []byte) (*EndpointPacket, bool) {
@@ -174,8 +189,16 @@ func (e *endPointDiscovery) updateCache(packet *EndpointPacket) {
 	endPoint := packet.From
 	if packet.Status == StatusOnline {
 		e.endpoints.AppendIfAbsent(endPoint)
+		e.discoverEvenChan <- &DiscoveryEvent{
+			Type:     EventAddEndPoint,
+			Endpoint: endPoint,
+		}
 	} else if packet.Status == StatusOffline {
 		e.endpoints.RemoveIfPresent(endPoint)
+		e.discoverEvenChan <- &DiscoveryEvent{
+			Type:     EventDeleteEventPoint,
+			Endpoint: endPoint,
+		}
 	} else {
 		e.logger.Errorf("unknown status '%s' from endpoint = %v", packet.Status, endPoint)
 	}

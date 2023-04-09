@@ -20,7 +20,7 @@ func (s *sender) Start() {
 	if err != nil {
 		s.logger.Fatalf("listen udp %d failed, err=%s", s.udpPort, err)
 	}
-	s.logger.Printf("start %s ...")
+	s.logger.Println("start ...")
 
 	for {
 		select {

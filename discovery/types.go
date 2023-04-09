@@ -13,3 +13,16 @@ type EndpointPacket struct {
 	From   *models.EndPoint `json:"from"`
 	Status EndPointStatus   `json:"status"`
 }
+
+type DiscoverEventType int
+
+const (
+	EventUnknown = iota
+	EventAddEndPoint
+	EventDeleteEventPoint
+)
+
+type DiscoveryEvent struct {
+	Type     DiscoverEventType
+	Endpoint *models.EndPoint
+}

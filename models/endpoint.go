@@ -9,7 +9,7 @@ type EndPoint struct {
 	Ip         string `json:"ip"`
 	Name       string `json:"name"`
 	DeviceName string `json:"deviceName"`
-	key        string
+	Key_       string
 }
 
 func (ep *EndPoint) JsonString() string {
@@ -21,8 +21,8 @@ func (ep *EndPoint) JsonString() string {
 }
 
 func (ep *EndPoint) Key() string {
-	if ep.key == "" {
-		ep.key = fmt.Sprintf("%s$%s$%s", ep.Ip, ep.Name, ep.DeviceName)
+	if ep.Key_ == "" {
+		ep.Key_ = fmt.Sprintf("%s$%s$%s", ep.Ip, ep.Name, ep.DeviceName)
 	}
-	return ep.key
+	return ep.Key_
 }

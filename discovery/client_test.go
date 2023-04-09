@@ -1,8 +1,11 @@
 package discovery
 
 import (
+	"fmt"
 	"math"
 	"net"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -58,4 +61,34 @@ func UInt32ToIP(intIP uint32) net.IP {
 	bytes[3] = byte((intIP >> 24) & 0xFF)
 
 	return net.IPv4(bytes[3], bytes[2], bytes[1], bytes[0])
+}
+
+func Test_GetOutBoundIP(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	addrs, err := net.LookupHost(hostname)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, addr := range addrs {
+		fmt.Println(addr)
+	}
+}
+
+func GetOutBoundIP() (ip string, err error) {
+	conn, err := net.Dial("udp", "8.8.8.8:53")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	fmt.Println(localAddr.String())
+	ip = strings.Split(localAddr.String(), ":")[0]
+	return
 }
