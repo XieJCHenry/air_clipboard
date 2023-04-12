@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"os"
 	"strings"
 	"testing"
 )
@@ -64,20 +63,20 @@ func UInt32ToIP(intIP uint32) net.IP {
 }
 
 func Test_GetOutBoundIP(t *testing.T) {
-	hostname, err := os.Hostname()
+	interfaceAddr, err := net.InterfaceAddrs()
 	if err != nil {
-		fmt.Println(err)
-		return
+		fmt.Printf("fail to get net interfaces ipAddress: %v\n", err)
+
 	}
 
-	addrs, err := net.LookupHost(hostname)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	for _, addr := range addrs {
-		fmt.Println(addr)
+	for _, address := range interfaceAddr {
+		ipNet, isVailIpNet := address.(*net.IPNet)
+		// 检查ip地址判断是否回环地址
+		if isVailIpNet && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				t.Logf("ip %s", ipNet.IP.To4())
+			}
+		}
 	}
 }
 

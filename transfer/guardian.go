@@ -1,7 +1,7 @@
 package transfer
 
 import (
-	"air_clipboard/models"
+	"air_clipboard/models/message"
 	"net"
 
 	"go.uber.org/zap"
@@ -12,17 +12,17 @@ type guardian struct {
 	id         string
 	conn       net.Conn
 	exit       chan struct{}
-	sendChan   chan *models.Message
-	submitChan chan *models.Message
+	sendChan   chan *message.Message
+	submitChan chan *message.Message
 }
 
-func newGuardian(logger *zap.SugaredLogger, key string, conn net.Conn, submitChan chan *models.Message) *guardian {
+func newGuardian(logger *zap.SugaredLogger, key string, conn net.Conn, submitChan chan *message.Message) *guardian {
 	return &guardian{
 		logger:     logger,
 		id:         key,
 		conn:       conn,
 		exit:       make(chan struct{}, 1),
-		sendChan:   make(chan *models.Message, 32),
+		sendChan:   make(chan *message.Message, 32),
 		submitChan: submitChan,
 	}
 }
@@ -52,11 +52,10 @@ func (g *guardian) Start() {
 				buffer := make([]byte, 4096)
 				n, err := g.conn.Read(buffer)
 				if err != nil {
-					g.logger.Errorf("read from failed, err = %s", err)
 					continue
 				}
 				buffer = buffer[:n]
-				msg := &models.Message{}
+				msg := &message.Message{}
 				msg.Unmarshal(buffer)
 				g.submitChan <- msg
 			}
@@ -64,7 +63,7 @@ func (g *guardian) Start() {
 	}
 }
 
-func (g *guardian) Send(msg *models.Message) {
+func (g *guardian) Send(msg *message.Message) {
 	if msg != nil {
 		g.sendChan <- msg
 	}

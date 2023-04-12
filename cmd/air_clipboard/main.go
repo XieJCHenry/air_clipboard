@@ -53,7 +53,7 @@ func main() {
 	discoveryService := discovery.New(sugaredLogger, DiscoveryPort, 1, selfInfo)
 	go discoveryService.Start()
 
-	transferService := transfer.New(sugaredLogger, TransferPort, selfInfo)
+	transferService := transfer.New(sugaredLogger, TransferPort, selfInfo, discoveryService)
 	go transferService.Start()
 	// backend start end --------------------------------------------------------------------------------
 
@@ -72,14 +72,13 @@ func main() {
 	go func() {
 		for {
 			select {
-			case event := <-discoveryService.OnDiscoverEvent():
+			case _ = <-discoveryService.OnDiscoverEvent():
 				{
 					// notify transfer service
-					transferService.AddTransfer(event.Endpoint)
 					// update ui
-					endpoints = []interface{}{selfInfo}
-					endpointsVO.Set(endpoints) // 重置
-					for _, point := range discoveryService.EndPoints().ToBuiltIn() {
+					endpointsVO.Set([]interface{}{}) // 重置
+					endpointBuiltIns := discoveryService.EndPoints().ToBuiltIn()
+					for _, point := range endpointBuiltIns {
 						endpointsVO.Append(point)
 					}
 				}
@@ -111,11 +110,15 @@ func main() {
 			select {
 			case packet := <-transferService.RecvFrom():
 				{
-					sendTime := time.Unix(packet.Header.SendTime, 0).Format("2006-01-02 15:04:05")
-					card := ui.NewHistoryCard()
-					card.SetTitle(packet.Body.Content)
-					card.SetSubTitle(fmt.Sprintf("发送人：%s，时间：%s", packet.Header.Sender, sendTime))
-					historyVO.Append(card)
+					msg := &transfer.BaseMessage{
+						Type:     transfer.ContentTypeText,
+						Content:  []byte(packet.Body.Content),
+						SendTime: packet.Header.SendTime,
+						RecvTime: time.Now().Unix(),
+						Sender:   transfer.Sender(packet.Header.Sender),
+					}
+					sugaredLogger.Infof("recv packet = %v", packet)
+					historyVO.Append(msg)
 				}
 			}
 		}

@@ -8,13 +8,6 @@ const (
 	ContentTypeText
 )
 
-type Message interface {
-	GetType() ContentType
-	GetSendTime() int64
-	GetRecvTime() int64
-	GetSender() Sender
-}
-
 type BaseMessage struct {
 	Type     ContentType
 	Content  []byte
@@ -37,14 +30,4 @@ func (bm *BaseMessage) GetRecvTime() int64 {
 
 func (bm *BaseMessage) GetType() ContentType {
 	return bm.Type
-}
-
-func NewTextMessage(content string, sendTime int64, recvTime int64, sender Sender) Message {
-	return &BaseMessage{
-		Type:     ContentTypeText,
-		Content:  []byte(content),
-		SendTime: sendTime,
-		RecvTime: recvTime,
-		Sender:   sender,
-	}
 }

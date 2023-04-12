@@ -9,7 +9,7 @@ type EndPoint struct {
 	Ip         string `json:"ip"`
 	Name       string `json:"name"`
 	DeviceName string `json:"deviceName"`
-	Key_       string
+	key        string
 }
 
 func (ep *EndPoint) JsonString() string {
@@ -21,8 +21,15 @@ func (ep *EndPoint) JsonString() string {
 }
 
 func (ep *EndPoint) Key() string {
-	if ep.Key_ == "" {
-		ep.Key_ = fmt.Sprintf("%s", ep.Ip)
+	if ep.key == "" {
+		ep.key = fmt.Sprintf("%s", ep.Ip)
 	}
-	return ep.Key_
+	return ep.key
+}
+
+// Equal for go-cmp
+func (ep *EndPoint) Equal(other *EndPoint) bool {
+	return ep.Ip == other.Ip &&
+		ep.Name == other.Name &&
+		ep.DeviceName == other.DeviceName
 }
