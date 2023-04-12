@@ -120,6 +120,9 @@ func (e *endPointDiscovery) startReceiver() {
 					e.logger.Errorf("read from udp failed, err = %s", err)
 					continue
 				}
+				if n == 0 {
+					continue
+				}
 				// 获取收到的数据包，解析是否是air_clipboard其他endpoint发来的
 				pack, err := e.packetHandler.Parse(data[:n])
 				if err != nil {
@@ -148,6 +151,7 @@ func (e *endPointDiscovery) broadcastSelfInfo() {
 	sendBytes, err := e.marshalSelfInfo()
 	if err != nil {
 		e.logger.Errorf("marshalSelfInfo failed, err=%s", err)
+		return
 	}
 	_, err = remoteCon.Write(sendBytes)
 	if err != nil {
@@ -197,7 +201,7 @@ func (e *endPointDiscovery) OnDiscoverEvent() chan *DiscoveryEvent {
 
 func (e *endPointDiscovery) handlePacket(pack *packet.Packet, addr *net.UDPAddr) error {
 	endpointPacket := &EndpointPacket{}
-	err := json.Unmarshal(pack.Body(), endpointPacket)
+	err := json.Unmarshal(pack.GetBody(), endpointPacket)
 	if err != nil {
 		e.logger.Errorf("unmarshal packet from other failed, err=%s", err)
 		return err

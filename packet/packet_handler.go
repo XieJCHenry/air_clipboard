@@ -1,8 +1,7 @@
 package packet
 
 import (
-	"bytes"
-	"encoding/binary"
+	"encoding/json"
 	"fmt"
 
 	"github.com/XieJCHenry/gokits/collections/set"
@@ -19,9 +18,8 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) Parse(data []byte) (*Packet, error) {
-	buffer := bytes.NewBuffer(data)
 	packet := new(Packet)
-	err := binary.Read(buffer, binary.LittleEndian, packet)
+	err := json.Unmarshal(data, packet)
 	if err != nil {
 		return nil, fmt.Errorf("parse packet from binary failed, err = %s", err)
 	}

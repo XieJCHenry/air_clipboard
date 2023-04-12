@@ -1,37 +1,33 @@
 package packet
 
 import (
-	"bytes"
-	"encoding/binary"
+	"encoding/json"
 )
 
 type ProtocolID int
 
 type Packet struct {
-	Id   ProtocolID
-	body []byte
+	Id   ProtocolID `json:"id,omitempty"`
+	Body []byte     `json:"body,omitempty"`
 }
 
 func NewPacket(id ProtocolID, body []byte) *Packet {
 	return &Packet{
 		Id:   id,
-		body: body,
+		Body: body,
 	}
 }
 
 func Marshal(packet *Packet) ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	err := binary.Write(buffer, binary.LittleEndian, *packet)
-	return buffer.Bytes(), err
+	return json.Marshal(packet)
 }
 
 func Unmarshal(data []byte) (*Packet, error) {
-	buffer := bytes.NewBuffer(data)
 	packet := new(Packet)
-	err := binary.Read(buffer, binary.LittleEndian, packet)
+	err := json.Unmarshal(data, packet)
 	return packet, err
 }
 
-func (p *Packet) Body() []byte {
-	return p.body
+func (p *Packet) GetBody() []byte {
+	return p.Body
 }
